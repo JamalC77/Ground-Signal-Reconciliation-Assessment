@@ -175,6 +175,28 @@ def test_load_snapshot_accepts_headers_with_extra_whitespace(tmp_path: Path) -> 
     )
 
 
+def test_load_snapshot_accepts_bom_prefixed_case_insensitive_headers(
+    tmp_path: Path,
+) -> None:
+    bom_snapshot = tmp_path / "bom_snapshot.csv"
+    bom_snapshot.write_text(
+        (
+            "SKU,Product_Name,Qty,Warehouse,Updated_At\n"
+            "SKU-001,Widget A,10,Warehouse A,2024-01-15\n"
+        ),
+        encoding="utf-8-sig",
+    )
+
+    result = load_snapshot(
+        bom_snapshot,
+        snapshot=SnapshotName.SNAPSHOT_2,
+    )
+
+    assert len(result.records) == 1
+    assert result.records[0].sku == "SKU-001"
+    assert result.records[0].quantity == 10
+
+
 def test_load_snapshot_rejects_short_rows_as_quality_issues(tmp_path: Path) -> None:
     short_row_snapshot = tmp_path / "short_row_snapshot.csv"
     short_row_snapshot.write_text(

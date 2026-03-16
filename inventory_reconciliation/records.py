@@ -26,6 +26,8 @@ class IssueCode(str, Enum):
     NEGATIVE_QUANTITY = "negative_quantity"
     NORMALIZED_DATE = "normalized_date"
     INVALID_DATE = "invalid_date"
+    MIXED_SNAPSHOT_DATES = "mixed_snapshot_dates"
+    SNAPSHOT_ORDER_INVALID = "snapshot_order_invalid"
     DUPLICATE_SKU = "duplicate_sku"
     SKIPPED_EMPTY_ROW = "skipped_empty_row"
 
@@ -35,6 +37,7 @@ class RowAction(str, Enum):
     REJECTED = "rejected"
     SKIPPED_EMPTY = "skipped_empty"
     SKIPPED_DUPLICATE = "skipped_duplicate"
+    NOT_APPLICABLE = "not_applicable"
 
 
 IssueDetails = dict[str, str | int]
@@ -56,7 +59,7 @@ class QualityIssue:
     code: IssueCode
     severity: IssueSeverity
     snapshot: SnapshotName
-    source_line: int
+    source_line: int | None
     message: str
     row_action: RowAction
     field_name: str | None = None

@@ -66,7 +66,7 @@ SNAPSHOT_COLUMN_MAPPINGS: dict[SnapshotName, SnapshotColumnMapping] = {
 def load_snapshot(path: Path, *, snapshot: SnapshotName) -> SnapshotLoadResult:
     mapping = SNAPSHOT_COLUMN_MAPPINGS[snapshot]
 
-    with path.open("r", encoding="utf-8", newline="") as handle:
+    with path.open("r", encoding="utf-8-sig", newline="") as handle:
         reader = csv.reader(handle)
         fieldnames = _normalize_headers(next(reader, None))
         _validate_headers(fieldnames, mapping=mapping, path=path)
@@ -153,7 +153,11 @@ def _validate_headers(
 def _normalize_headers(fieldnames: Sequence[str] | None) -> list[str] | None:
     if fieldnames is None:
         return None
-    return [fieldname.strip() for fieldname in fieldnames]
+    return [_normalize_header(fieldname) for fieldname in fieldnames]
+
+
+def _normalize_header(fieldname: str) -> str:
+    return fieldname.removeprefix("\ufeff").strip().lower()
 
 
 def _is_structurally_empty_row(row: Sequence[str]) -> bool:

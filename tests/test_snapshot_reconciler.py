@@ -134,6 +134,60 @@ def test_reconcile_snapshots_rejects_duplicate_skus() -> None:
         reconcile_snapshots(duplicate_records, [])
 
 
+def test_reconcile_snapshots_classifies_increased_quantity() -> None:
+    snapshot_1_records = [
+        _build_record(
+            snapshot=SnapshotName.SNAPSHOT_1,
+            source_line=2,
+            sku="SKU-001",
+            name="Widget A",
+            quantity=10,
+            location="Warehouse A",
+            counted_on=date(2024, 1, 8),
+        )
+    ]
+    snapshot_2_records = [
+        _build_record(
+            snapshot=SnapshotName.SNAPSHOT_2,
+            source_line=2,
+            sku="SKU-001",
+            name="Widget A",
+            quantity=14,
+            location="Warehouse A",
+            counted_on=date(2024, 1, 15),
+        )
+    ]
+
+    result = reconcile_snapshots(snapshot_1_records, snapshot_2_records)
+
+    assert len(result.present_in_both) == 1
+    assert result.present_in_both[0].quantity_change is QuantityChangeKind.INCREASED
+    assert result.present_in_both[0].quantity_delta == 4
+    assert result.summary.quantity_changed == 1
+    assert result.summary.quantity_unchanged == 0
+    assert result.summary.quantity_increased == 1
+    assert result.summary.quantity_decreased == 0
+
+
+def test_reconcile_snapshots_handles_empty_inputs() -> None:
+    result = reconcile_snapshots([], [])
+
+    assert result.present_in_both == []
+    assert result.only_in_snapshot_1 == []
+    assert result.only_in_snapshot_2 == []
+    assert result.summary.snapshot_1_records == 0
+    assert result.summary.snapshot_2_records == 0
+    assert result.summary.present_in_both == 0
+    assert result.summary.quantity_changed == 0
+    assert result.summary.quantity_unchanged == 0
+    assert result.summary.quantity_increased == 0
+    assert result.summary.quantity_decreased == 0
+    assert result.summary.only_in_snapshot_1 == 0
+    assert result.summary.only_in_snapshot_2 == 0
+    assert result.summary.name_changed == 0
+    assert result.summary.location_changed == 0
+
+
 def test_reconcile_snapshots_matches_real_snapshot_counts() -> None:
     snapshot_1 = load_snapshot(
         _DATA_DIR / "snapshot_1.csv",

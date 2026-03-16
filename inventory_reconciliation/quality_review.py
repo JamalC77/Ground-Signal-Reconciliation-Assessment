@@ -12,6 +12,7 @@ from inventory_reconciliation.records import (
 _MANUAL_REVIEW_WARNING_CODES = frozenset(
     {
         IssueCode.DUPLICATE_SKU,
+        IssueCode.MIXED_SNAPSHOT_DATES,
         IssueCode.NEGATIVE_QUANTITY,
     }
 )
@@ -40,7 +41,7 @@ def collect_flagged_issues_from_results(
 def _issue_sort_key(issue: QualityIssue) -> tuple[str, int, str, str, str]:
     return (
         issue.snapshot.value,
-        issue.source_line,
+        issue.source_line if issue.source_line is not None else -1,
         issue.code.value,
         issue.field_name or "",
         issue.sku or "",

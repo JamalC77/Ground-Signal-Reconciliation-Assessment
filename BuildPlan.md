@@ -32,11 +32,12 @@ This plan is optimized for the assessment goals: show clear problem decompositio
 
 - Status: complete
 - Focus: ensure messy input produces inspectable warnings instead of plausible but wrong conclusions.
-- Deliverables: targeted handling and tests for malformed SKUs, duplicate conflicts, invalid or coerced quantities, whitespace issues, format inconsistencies, blank trailing rows, and clear criteria for what belongs in the `flagged_items` section of the report.
+- Deliverables: targeted handling and tests for malformed SKUs, duplicate conflicts, invalid or coerced quantities, whitespace issues, format inconsistencies, blank trailing rows, file-level temporal validation, and clear criteria for what belongs in the `flagged_items` section of the report.
 - Exit criteria: known edge cases degrade gracefully, remain visible in the output, and are covered by regression tests.
 
 ### Phase 4: Package for Review
 
+- Status: complete
 - Focus: make the solution easy to run, audit, and discuss.
 - Deliverables: a thin `reconcile.py` entrypoint, `output/reconciliation_report.json` with all three reconciliation categories plus `flagged_items` and summary, focused tests, and a concise `NOTES.md` covering assumptions, quality issues, and approach.
 - Exit criteria: one command reproduces the report, and a reviewer can distinguish between accepted reconciliation results and items that still require manual verification.
@@ -57,12 +58,14 @@ This plan is optimized for the assessment goals: show clear problem decompositio
 │   ├── canonicalization.py
 │   ├── snapshot_reconciler.py
 │   ├── quality_review.py
+│   ├── temporal_validation.py
 │   └── reporting.py
 ├── tests/
 │   ├── test_snapshot_loader.py
 │   ├── test_canonicalization.py
 │   ├── test_snapshot_reconciler.py
 │   ├── test_quality_review.py
+│   ├── test_temporal_validation.py
 │   └── test_end_to_end.py
 ├── NOTES.md
 ├── BuildPlan.md
@@ -77,6 +80,7 @@ This plan is optimized for the assessment goals: show clear problem decompositio
 - `inventory_reconciliation/canonicalization.py`: normalize SKU, quantity, whitespace, and date fields.
 - `inventory_reconciliation/snapshot_reconciler.py`: classify matched, added, removed, and quantity-changed items.
 - `inventory_reconciliation/quality_review.py`: define which quality issues require manual review and belong in `flagged_items`.
+- `inventory_reconciliation/temporal_validation.py`: validate per-file snapshot dates and cross-file temporal ordering before trusting the comparison.
 - `inventory_reconciliation/reporting.py`: write `reconciliation_report.json` with the three reconciliation categories, a `flagged_items` section for reviewer verification, and a summary.
 - `tests/`: mirror the risk areas, then verify the full workflow end to end.
 
