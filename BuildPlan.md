@@ -23,12 +23,14 @@ This plan is optimized for the assessment goals: show clear problem decompositio
 
 ### Phase 2: Build the Reconciliation Core
 
+- Status: complete
 - Focus: compare normalized records in a deterministic and explainable way.
 - Deliverables: items present in both snapshots with quantity comparison details, items only in snapshot 1, items only in snapshot 2, and a summary that ties back to row-level results.
 - Exit criteria: for any SKU, the system can explain whether it matched, was added, was removed, or could not be fully compared because of data quality constraints.
 
 ### Phase 3: Harden Against Real-World Data Quality
 
+- Status: complete
 - Focus: ensure messy input produces inspectable warnings instead of plausible but wrong conclusions.
 - Deliverables: targeted handling and tests for malformed SKUs, duplicate conflicts, invalid or coerced quantities, whitespace issues, format inconsistencies, blank trailing rows, and clear criteria for what belongs in the `flagged_items` section of the report.
 - Exit criteria: known edge cases degrade gracefully, remain visible in the output, and are covered by regression tests.
@@ -54,11 +56,13 @@ This plan is optimized for the assessment goals: show clear problem decompositio
 │   ├── snapshot_loader.py
 │   ├── canonicalization.py
 │   ├── snapshot_reconciler.py
+│   ├── quality_review.py
 │   └── reporting.py
 ├── tests/
 │   ├── test_snapshot_loader.py
 │   ├── test_canonicalization.py
 │   ├── test_snapshot_reconciler.py
+│   ├── test_quality_review.py
 │   └── test_end_to_end.py
 ├── NOTES.md
 ├── BuildPlan.md
@@ -72,6 +76,7 @@ This plan is optimized for the assessment goals: show clear problem decompositio
 - `inventory_reconciliation/snapshot_loader.py`: load CSVs, apply column mapping, and skip structurally empty rows.
 - `inventory_reconciliation/canonicalization.py`: normalize SKU, quantity, whitespace, and date fields.
 - `inventory_reconciliation/snapshot_reconciler.py`: classify matched, added, removed, and quantity-changed items.
+- `inventory_reconciliation/quality_review.py`: define which quality issues require manual review and belong in `flagged_items`.
 - `inventory_reconciliation/reporting.py`: write `reconciliation_report.json` with the three reconciliation categories, a `flagged_items` section for reviewer verification, and a summary.
 - `tests/`: mirror the risk areas, then verify the full workflow end to end.
 

@@ -24,6 +24,17 @@ def test_normalize_sku_repairs_case_and_missing_hyphen() -> None:
     assert issues[0].normalized_value == "SKU-005"
 
 
+def test_normalize_sku_rejects_invalid_pattern() -> None:
+    normalized_sku, issues = normalize_sku(
+        "ABCXYZ",
+        snapshot=SnapshotName.SNAPSHOT_2,
+        source_line=6,
+    )
+
+    assert normalized_sku is None
+    assert [issue.code for issue in issues] == [IssueCode.INVALID_SKU]
+
+
 def test_parse_quantity_coerces_whole_number_float_and_logs_it() -> None:
     quantity, issues = parse_quantity(
         "80.00",
@@ -49,6 +60,18 @@ def test_parse_quantity_rejects_fractional_values() -> None:
     assert [issue.code for issue in issues] == [IssueCode.INVALID_QUANTITY]
 
 
+def test_parse_quantity_rejects_non_numeric_values() -> None:
+    quantity, issues = parse_quantity(
+        "abc",
+        snapshot=SnapshotName.SNAPSHOT_2,
+        source_line=3,
+        sku="SKU-002",
+    )
+
+    assert quantity is None
+    assert [issue.code for issue in issues] == [IssueCode.INVALID_QUANTITY]
+
+
 def test_normalize_date_converts_mmddyyyy_to_iso_date() -> None:
     normalized_date, issues = normalize_date(
         "01/15/2024",
@@ -60,6 +83,18 @@ def test_normalize_date_converts_mmddyyyy_to_iso_date() -> None:
     assert normalized_date == date(2024, 1, 15)
     assert [issue.code for issue in issues] == [IssueCode.NORMALIZED_DATE]
     assert issues[0].normalized_value == "2024-01-15"
+
+
+def test_normalize_date_rejects_unsupported_format() -> None:
+    normalized_date, issues = normalize_date(
+        "not-a-date",
+        snapshot=SnapshotName.SNAPSHOT_2,
+        source_line=34,
+        sku="SKU-035",
+    )
+
+    assert normalized_date is None
+    assert [issue.code for issue in issues] == [IssueCode.INVALID_DATE]
 
 
 def test_canonicalize_row_rejects_blank_required_name_after_trimming() -> None:

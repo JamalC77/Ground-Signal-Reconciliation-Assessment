@@ -381,6 +381,8 @@ def _strip_value(
             )
         )
     return cleaned_value, issues
+
+
 def _build_issue(
     *,
     code: IssueCode,

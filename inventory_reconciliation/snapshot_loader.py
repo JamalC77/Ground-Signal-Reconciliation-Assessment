@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import csv
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from itertools import zip_longest
 from pathlib import Path
 
-from inventory_reconciliation.canonicalization import CanonicalRowInput, canonicalize_row
+from inventory_reconciliation.canonicalization import (
+    CanonicalRowInput,
+    canonicalize_row,
+)
 from inventory_reconciliation.records import (
     CanonicalInventoryRecord,
     IssueCode,
@@ -124,6 +128,17 @@ def _validate_headers(
     if fieldnames is None:
         raise SnapshotSchemaError(f"{path} is missing a header row.")
 
+    duplicate_columns = sorted(
+        column_name
+        for column_name, count in Counter(fieldnames).items()
+        if column_name and count > 1
+    )
+    if duplicate_columns:
+        duplicate_list = ", ".join(duplicate_columns)
+        raise SnapshotSchemaError(
+            f"{path} has duplicate columns after normalization: {duplicate_list}."
+        )
+
     actual_columns = set(fieldnames)
     missing_columns = sorted(mapping.required_columns() - actual_columns)
     if not missing_columns:
@@ -145,7 +160,10 @@ def _is_structurally_empty_row(row: Sequence[str]) -> bool:
     return all(not value.strip() for value in row)
 
 
-def _build_row_mapping(fieldnames: Sequence[str], row: Sequence[str]) -> dict[str, str]:
+def _build_row_mapping(
+    fieldnames: Sequence[str],
+    row: Sequence[str],
+) -> dict[str, str]:
     return {
         fieldname: value
         for fieldname, value in zip_longest(fieldnames, row, fillvalue="")

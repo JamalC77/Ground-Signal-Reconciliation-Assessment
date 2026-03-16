@@ -119,6 +119,39 @@ def test_load_snapshot_rejects_missing_required_columns(tmp_path: Path) -> None:
         )
 
 
+def test_load_snapshot_rejects_missing_header_row(tmp_path: Path) -> None:
+    empty_snapshot = tmp_path / "empty_snapshot.csv"
+    empty_snapshot.write_text("", encoding="utf-8")
+
+    with pytest.raises(SnapshotSchemaError, match="missing a header row"):
+        load_snapshot(
+            empty_snapshot,
+            snapshot=SnapshotName.SNAPSHOT_2,
+        )
+
+
+def test_load_snapshot_rejects_duplicate_headers_after_normalization(
+    tmp_path: Path,
+) -> None:
+    duplicate_header_snapshot = tmp_path / "duplicate_header_snapshot.csv"
+    duplicate_header_snapshot.write_text(
+        (
+            "sku, sku , product_name, qty, warehouse, updated_at\n"
+            "SKU-001,IGNORED,Widget A,10,Warehouse A,2024-01-15\n"
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        SnapshotSchemaError,
+        match="duplicate columns after normalization: sku",
+    ):
+        load_snapshot(
+            duplicate_header_snapshot,
+            snapshot=SnapshotName.SNAPSHOT_2,
+        )
+
+
 def test_load_snapshot_accepts_headers_with_extra_whitespace(tmp_path: Path) -> None:
     spaced_header_snapshot = tmp_path / "spaced_header_snapshot.csv"
     spaced_header_snapshot.write_text(
@@ -137,4 +170,32 @@ def test_load_snapshot_accepts_headers_with_extra_whitespace(tmp_path: Path) -> 
     assert len(result.records) == 1
     assert result.records[0].sku == "SKU-001"
     assert result.records[0].quantity == 10
-    assert not any(issue.code == IssueCode.BLANK_REQUIRED_FIELD for issue in result.issues)
+    assert not any(
+        issue.code == IssueCode.BLANK_REQUIRED_FIELD for issue in result.issues
+    )
+
+
+def test_load_snapshot_rejects_short_rows_as_quality_issues(tmp_path: Path) -> None:
+    short_row_snapshot = tmp_path / "short_row_snapshot.csv"
+    short_row_snapshot.write_text(
+        (
+            "sku,product_name,qty,warehouse,updated_at\n"
+            "SKU-001,Widget A,10\n"
+        ),
+        encoding="utf-8",
+    )
+
+    result = load_snapshot(
+        short_row_snapshot,
+        snapshot=SnapshotName.SNAPSHOT_2,
+    )
+
+    assert result.records == []
+    assert [
+        (issue.code, issue.field_name, issue.row_action)
+        for issue in result.issues
+        if issue.source_line == 2
+    ] == [
+        (IssueCode.BLANK_REQUIRED_FIELD, "location", RowAction.REJECTED),
+        (IssueCode.BLANK_REQUIRED_FIELD, "counted_on", RowAction.REJECTED),
+    ]
