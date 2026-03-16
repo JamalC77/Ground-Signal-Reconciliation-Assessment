@@ -16,6 +16,7 @@ This plan is optimized for the assessment goals: show clear problem decompositio
 
 ### Phase 1: Define the Canonical Contract
 
+- Status: complete
 - Focus: map both input files into one internal record shape before attempting any diff.
 - Deliverables: per-snapshot column mapping, SKU normalization, quantity parsing, whitespace cleanup, date normalization, duplicate handling rules, and a quality issue log.
 - Exit criteria: every non-empty row is either converted into the canonical schema or represented as a logged quality issue.
