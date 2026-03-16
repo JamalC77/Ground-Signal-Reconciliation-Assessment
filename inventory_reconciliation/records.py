@@ -1,22 +1,20 @@
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 from datetime import date
-from enum import Enum
+from enum import StrEnum
 
 
-class SnapshotName(str, Enum):
+class SnapshotName(StrEnum):
     SNAPSHOT_1 = "snapshot_1"
     SNAPSHOT_2 = "snapshot_2"
 
 
-class IssueSeverity(str, Enum):
+class IssueSeverity(StrEnum):
     INFO = "info"
     WARNING = "warning"
     ERROR = "error"
 
 
-class IssueCode(str, Enum):
+class IssueCode(StrEnum):
     TRIMMED_WHITESPACE = "trimmed_whitespace"
     NORMALIZED_SKU = "normalized_sku"
     BLANK_REQUIRED_FIELD = "blank_required_field"
@@ -26,13 +24,14 @@ class IssueCode(str, Enum):
     NEGATIVE_QUANTITY = "negative_quantity"
     NORMALIZED_DATE = "normalized_date"
     INVALID_DATE = "invalid_date"
+    OVERLONG_ROW = "overlong_row"
     MIXED_SNAPSHOT_DATES = "mixed_snapshot_dates"
     SNAPSHOT_ORDER_INVALID = "snapshot_order_invalid"
     DUPLICATE_SKU = "duplicate_sku"
     SKIPPED_EMPTY_ROW = "skipped_empty_row"
 
 
-class RowAction(str, Enum):
+class RowAction(StrEnum):
     ACCEPTED = "accepted"
     REJECTED = "rejected"
     SKIPPED_EMPTY = "skipped_empty"
@@ -40,7 +39,7 @@ class RowAction(str, Enum):
     NOT_APPLICABLE = "not_applicable"
 
 
-IssueDetails = dict[str, str | int]
+type IssueDetails = dict[str, str | int]
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

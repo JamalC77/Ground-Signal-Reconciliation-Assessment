@@ -1,7 +1,10 @@
 import json
+import sys
 from pathlib import Path
 
-from reconcile import run_reconciliation
+import pytest
+
+from reconcile import main, run_reconciliation
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -19,10 +22,10 @@ def test_run_reconciliation_writes_expected_json_report(tmp_path: Path) -> None:
 
     assert written_report == report
     assert list(written_report) == [
-        "present_in_both",
+        "flagged_items",
         "only_in_snapshot_1",
         "only_in_snapshot_2",
-        "flagged_items",
+        "present_in_both",
         "summary",
     ]
     assert len(written_report["present_in_both"]) == 73
@@ -96,3 +99,77 @@ def test_run_reconciliation_includes_temporal_validation_issues(
     assert report["summary"]["quality_issue_counts_by_code"] == {
         "snapshot_order_invalid": 1
     }
+
+
+def test_main_returns_zero_when_report_has_no_error_issues(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output_path = tmp_path / "reconciliation_report.json"
+    snapshot_1_path = _REPO_ROOT / "data" / "snapshot_1.csv"
+    snapshot_2_path = _REPO_ROOT / "data" / "snapshot_2.csv"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "reconcile.py",
+            "--snapshot-1",
+            str(snapshot_1_path),
+            "--snapshot-2",
+            str(snapshot_2_path),
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    exit_code = main()
+
+    assert exit_code == 0
+    assert output_path.exists()
+
+
+def test_main_returns_non_zero_when_report_has_error_issues(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    snapshot_1_path = tmp_path / "snapshot_1.csv"
+    snapshot_2_path = tmp_path / "snapshot_2.csv"
+    output_path = tmp_path / "reconciliation_report.json"
+
+    snapshot_1_path.write_text(
+        (
+            "sku,name,quantity,location,last_counted\n"
+            "SKU-001,Widget A,10,Warehouse A,2024-01-15\n"
+        ),
+        encoding="utf-8",
+    )
+    snapshot_2_path.write_text(
+        (
+            "sku,product_name,qty,warehouse,updated_at\n"
+            "SKU-001,Widget A,8,Warehouse A,2024-01-14\n"
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "reconcile.py",
+            "--snapshot-1",
+            str(snapshot_1_path),
+            "--snapshot-2",
+            str(snapshot_2_path),
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    exit_code = main()
+    written_report = json.loads(output_path.read_text(encoding="utf-8"))
+
+    assert exit_code == 1
+    assert [item["code"] for item in written_report["flagged_items"]] == [
+        "snapshot_order_invalid"
+    ]

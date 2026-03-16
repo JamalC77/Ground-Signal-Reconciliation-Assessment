@@ -5,7 +5,7 @@ start with collaborating with AI to expedite my research and understanding of
 the problem. I've found GPT-5.4 and Opus 4.6 to be extremely helpful working
 through problems and that sometimes one model has a certain insight that the
 other lacks for a given instance. Through the assessment I worked in both Claude
-Code and Cursor and had the systems check each others outputs for notable areas
+Code and Cursor and had the systems check each other's outputs for notable areas
 of weakness and edge cases while I verified for accuracy.
 
 I approached the assessment in four phases: normalize each CSV into one internal
@@ -15,12 +15,24 @@ JSON report. The implementation keeps CSV loading and cleanup at the boundary,
 reconciliation logic in pure functions, and report serialization at the output
 boundary so each part is easier to review and test.
 
+Lastly, I allowed agents to comb over the project and worked through refining
+the quality of the code and tests. I had agents do that after my first full
+iteration and I came back and improved upon what was assembled. I've learned
+that there are often times where letting a longer running process run to check
+for issues or quality concerns can lead to drastically better output. That
+output can often be used to refine a quality assessment or improve the tool
+that shows the LLM what good looks like as it's building.
+
 Key decisions and assumptions:
 
 - SKU is the identity key after normalization. Name and location are tracked as
   metadata changes, but they do not determine record identity.
 - Snapshot schemas are mapped explicitly rather than merged implicitly because
   the two files use different column names for the same concepts.
+- Blank header columns are treated as schema errors because they can hide
+  shifted or extra data during CSV row mapping.
+- Rows with more values than headers are rejected as malformed instead of
+  silently truncating extra columns during CSV mapping.
 - Duplicate SKUs are not merged. The first occurrence is kept, and conflicting
   duplicates are surfaced as reviewable issues instead of being summed or
   overwritten silently.

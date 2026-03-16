@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from collections.abc import Iterable
 
 from inventory_reconciliation.records import (

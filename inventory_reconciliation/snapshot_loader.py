@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import csv
 from collections import Counter
 from collections.abc import Mapping, Sequence
@@ -70,6 +68,7 @@ def load_snapshot(path: Path, *, snapshot: SnapshotName) -> SnapshotLoadResult:
         reader = csv.reader(handle)
         fieldnames = _normalize_headers(next(reader, None))
         _validate_headers(fieldnames, mapping=mapping, path=path)
+        normalized_fieldnames = fieldnames or []
 
         records: list[CanonicalInventoryRecord] = []
         issues: list[QualityIssue] = []
@@ -90,7 +89,18 @@ def load_snapshot(path: Path, *, snapshot: SnapshotName) -> SnapshotLoadResult:
                 )
                 continue
 
-            mapped_row = _build_row_mapping(fieldnames or [], row)
+            if len(row) > len(normalized_fieldnames):
+                issues.append(
+                    _build_overlong_row_issue(
+                        snapshot=snapshot,
+                        source_line=source_line,
+                        fieldnames=normalized_fieldnames,
+                        row=row,
+                    )
+                )
+                continue
+
+            mapped_row = _build_row_mapping(normalized_fieldnames, row)
             canonical_input = _map_row_to_canonical_input(mapped_row, mapping)
             record, row_issues = canonicalize_row(
                 canonical_input,
@@ -127,6 +137,16 @@ def _validate_headers(
 ) -> None:
     if fieldnames is None:
         raise SnapshotSchemaError(f"{path} is missing a header row.")
+
+    blank_header_positions = [
+        index + 1 for index, column_name in enumerate(fieldnames) if not column_name
+    ]
+    if blank_header_positions:
+        position_list = ", ".join(str(position) for position in blank_header_positions)
+        raise SnapshotSchemaError(
+            f"{path} has blank header columns after normalization at positions: "
+            f"{position_list}."
+        )
 
     duplicate_columns = sorted(
         column_name
@@ -211,6 +231,35 @@ def _build_duplicate_issue(
             f"{duplicate_record.source_line}."
         ),
         row_action=RowAction.SKIPPED_DUPLICATE,
+        details=details,
+    )
+
+
+def _build_overlong_row_issue(
+    *,
+    snapshot: SnapshotName,
+    source_line: int,
+    fieldnames: Sequence[str],
+    row: Sequence[str],
+) -> QualityIssue:
+    extra_values = row[len(fieldnames) :]
+    details: dict[str, str | int] = {
+        "expected_column_count": len(fieldnames),
+        "actual_column_count": len(row),
+    }
+    if extra_values:
+        details["extra_values"] = ", ".join(
+            value if value else "<empty>" for value in extra_values
+        )
+
+    return QualityIssue(
+        code=IssueCode.OVERLONG_ROW,
+        severity=IssueSeverity.ERROR,
+        snapshot=snapshot,
+        source_line=source_line,
+        field_name="row",
+        message="Row has more values than headers and was rejected as malformed.",
+        row_action=RowAction.REJECTED,
         details=details,
     )
 

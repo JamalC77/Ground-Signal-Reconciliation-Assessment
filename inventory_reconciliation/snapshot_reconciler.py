@@ -1,13 +1,11 @@
-from __future__ import annotations
-
 from collections.abc import Iterable
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 from inventory_reconciliation.records import CanonicalInventoryRecord
 
 
-class QuantityChangeKind(str, Enum):
+class QuantityChangeKind(StrEnum):
     DECREASED = "decreased"
     UNCHANGED = "unchanged"
     INCREASED = "increased"

@@ -1,13 +1,13 @@
-from __future__ import annotations
-
 import json
-from collections.abc import Iterable
 from collections import Counter
+from collections.abc import Iterable
 from pathlib import Path
+from typing import TypedDict
 
 from inventory_reconciliation.quality_review import collect_flagged_issues
 from inventory_reconciliation.records import (
     CanonicalInventoryRecord,
+    IssueDetails,
     QualityIssue,
     SnapshotLoadResult,
 )
@@ -17,13 +17,75 @@ from inventory_reconciliation.snapshot_reconciler import (
 )
 
 
+class SerializedRecord(TypedDict):
+    snapshot: str
+    source_line: int
+    sku: str
+    name: str
+    quantity: int
+    location: str
+    counted_on: str
+
+
+class SerializedMatchedItem(TypedDict):
+    sku: str
+    quantity_before: int
+    quantity_after: int
+    quantity_delta: int
+    quantity_change: str
+    quantity_changed: bool
+    name_changed: bool
+    location_changed: bool
+    snapshot_1_record: SerializedRecord
+    snapshot_2_record: SerializedRecord
+
+
+class SerializedIssue(TypedDict):
+    snapshot: str
+    source_line: int | None
+    code: str
+    severity: str
+    row_action: str
+    field_name: str | None
+    sku: str | None
+    message: str
+    raw_value: str | None
+    normalized_value: str | int | None
+    details: IssueDetails
+
+
+class SerializedSummary(TypedDict):
+    snapshot_1_records: int
+    snapshot_2_records: int
+    present_in_both: int
+    quantity_changed: int
+    quantity_unchanged: int
+    quantity_increased: int
+    quantity_decreased: int
+    only_in_snapshot_1: int
+    only_in_snapshot_2: int
+    name_changed: int
+    location_changed: int
+    total_quality_issues: int
+    flagged_items_count: int
+    quality_issue_counts_by_code: dict[str, int]
+
+
+class ReconciliationReport(TypedDict):
+    present_in_both: list[SerializedMatchedItem]
+    only_in_snapshot_1: list[SerializedRecord]
+    only_in_snapshot_2: list[SerializedRecord]
+    flagged_items: list[SerializedIssue]
+    summary: SerializedSummary
+
+
 def build_reconciliation_report(
     snapshot_1_result: SnapshotLoadResult,
     snapshot_2_result: SnapshotLoadResult,
     reconciliation_result: SnapshotReconciliationResult,
     *,
     additional_issues: Iterable[QualityIssue] = (),
-) -> dict[str, object]:
+) -> ReconciliationReport:
     all_issues = [
         *snapshot_1_result.issues,
         *snapshot_2_result.issues,
@@ -53,10 +115,13 @@ def build_reconciliation_report(
     }
 
 
-def write_reconciliation_report(report: dict[str, object], output_path: Path) -> None:
+def write_reconciliation_report(
+    report: ReconciliationReport,
+    output_path: Path,
+) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8", newline="\n") as handle:
-        json.dump(report, handle, indent=2)
+        json.dump(report, handle, indent=2, sort_keys=True)
         handle.write("\n")
 
 
@@ -65,7 +130,7 @@ def _build_summary(
     reconciliation_result: SnapshotReconciliationResult,
     all_issues: list[QualityIssue],
     flagged_issues: list[QualityIssue],
-) -> dict[str, object]:
+) -> SerializedSummary:
     issue_counts_by_code = Counter(issue.code.value for issue in all_issues)
     summary = reconciliation_result.summary
 
@@ -87,7 +152,7 @@ def _build_summary(
     }
 
 
-def _serialize_record(record: CanonicalInventoryRecord) -> dict[str, object]:
+def _serialize_record(record: CanonicalInventoryRecord) -> SerializedRecord:
     return {
         "snapshot": record.snapshot.value,
         "source_line": record.source_line,
@@ -99,7 +164,7 @@ def _serialize_record(record: CanonicalInventoryRecord) -> dict[str, object]:
     }
 
 
-def _serialize_matched_item(item: MatchedInventoryItem) -> dict[str, object]:
+def _serialize_matched_item(item: MatchedInventoryItem) -> SerializedMatchedItem:
     return {
         "sku": item.sku,
         "quantity_before": item.quantity_before,
@@ -114,7 +179,7 @@ def _serialize_matched_item(item: MatchedInventoryItem) -> dict[str, object]:
     }
 
 
-def _serialize_issue(issue: QualityIssue) -> dict[str, object]:
+def _serialize_issue(issue: QualityIssue) -> SerializedIssue:
     return {
         "snapshot": issue.snapshot.value,
         "source_line": issue.source_line,

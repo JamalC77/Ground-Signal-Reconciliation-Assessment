@@ -1,11 +1,11 @@
-from __future__ import annotations
-
 import argparse
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 
-from inventory_reconciliation.records import SnapshotName
+from inventory_reconciliation.records import IssueSeverity, SnapshotName
 from inventory_reconciliation.reporting import (
+    ReconciliationReport,
     build_reconciliation_report,
     write_reconciliation_report,
 )
@@ -20,11 +20,30 @@ DEFAULT_SNAPSHOT_2_PATH = Path("data") / "snapshot_2.csv"
 DEFAULT_OUTPUT_PATH = Path("output") / "reconciliation_report.json"
 
 
+@dataclass(frozen=True, slots=True)
+class ReconciliationRunResult:
+    report: ReconciliationReport
+    has_error_quality_issues: bool
+
+
 def run_reconciliation(
     snapshot_1_path: Path = DEFAULT_SNAPSHOT_1_PATH,
     snapshot_2_path: Path = DEFAULT_SNAPSHOT_2_PATH,
     output_path: Path = DEFAULT_OUTPUT_PATH,
-) -> dict[str, object]:
+) -> ReconciliationReport:
+    return _run_reconciliation_with_status(
+        snapshot_1_path=snapshot_1_path,
+        snapshot_2_path=snapshot_2_path,
+        output_path=output_path,
+    ).report
+
+
+def _run_reconciliation_with_status(
+    *,
+    snapshot_1_path: Path,
+    snapshot_2_path: Path,
+    output_path: Path,
+) -> ReconciliationRunResult:
     snapshot_1_result = load_snapshot(
         snapshot_1_path,
         snapshot=SnapshotName.SNAPSHOT_1,
@@ -41,6 +60,11 @@ def run_reconciliation(
         snapshot_1_result.records,
         snapshot_2_result.records,
     )
+    all_issues = [
+        *snapshot_1_result.issues,
+        *snapshot_2_result.issues,
+        *temporal_issues,
+    ]
     report = build_reconciliation_report(
         snapshot_1_result,
         snapshot_2_result,
@@ -48,18 +72,30 @@ def run_reconciliation(
         additional_issues=temporal_issues,
     )
     write_reconciliation_report(report, output_path)
-    return report
+    return ReconciliationRunResult(
+        report=report,
+        has_error_quality_issues=any(
+            issue.severity is IssueSeverity.ERROR for issue in all_issues
+        ),
+    )
 
 
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     arguments = _build_argument_parser().parse_args()
-    run_reconciliation(
+    result = _run_reconciliation_with_status(
         snapshot_1_path=arguments.snapshot_1,
         snapshot_2_path=arguments.snapshot_2,
         output_path=arguments.output,
     )
     log.info("Wrote reconciliation report to %s", arguments.output)
+    if result.has_error_quality_issues:
+        log.error(
+            "Reconciliation report contains error-severity quality issues; "
+            "review %s before trusting the results.",
+            arguments.output,
+        )
+        return 1
     return 0
 
 

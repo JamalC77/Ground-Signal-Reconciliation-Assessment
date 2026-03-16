@@ -3,7 +3,12 @@ from pathlib import Path
 
 import pytest
 
-from inventory_reconciliation.records import IssueCode, RowAction, SnapshotName
+from inventory_reconciliation.records import (
+    IssueCode,
+    IssueSeverity,
+    RowAction,
+    SnapshotName,
+)
 from inventory_reconciliation.snapshot_loader import SnapshotSchemaError, load_snapshot
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -152,6 +157,46 @@ def test_load_snapshot_rejects_duplicate_headers_after_normalization(
         )
 
 
+@pytest.mark.parametrize(
+    ("header_row", "data_row", "expected_position"),
+    [
+        (
+            "sku,product_name,qty,warehouse,updated_at,\n",
+            "SKU-001,Widget A,10,Warehouse A,2024-01-15,unexpected\n",
+            "6",
+        ),
+        (
+            "sku, ,product_name,qty,warehouse,updated_at\n",
+            "SKU-001,unexpected,Widget A,10,Warehouse A,2024-01-15\n",
+            "2",
+        ),
+    ],
+)
+def test_load_snapshot_rejects_blank_headers_after_normalization(
+    tmp_path: Path,
+    header_row: str,
+    data_row: str,
+    expected_position: str,
+) -> None:
+    blank_header_snapshot = tmp_path / "blank_header_snapshot.csv"
+    blank_header_snapshot.write_text(
+        header_row + data_row,
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        SnapshotSchemaError,
+        match=(
+            "blank header columns after normalization at positions: "
+            f"{expected_position}"
+        ),
+    ):
+        load_snapshot(
+            blank_header_snapshot,
+            snapshot=SnapshotName.SNAPSHOT_2,
+        )
+
+
 def test_load_snapshot_accepts_headers_with_extra_whitespace(tmp_path: Path) -> None:
     spaced_header_snapshot = tmp_path / "spaced_header_snapshot.csv"
     spaced_header_snapshot.write_text(
@@ -221,3 +266,56 @@ def test_load_snapshot_rejects_short_rows_as_quality_issues(tmp_path: Path) -> N
         (IssueCode.BLANK_REQUIRED_FIELD, "location", RowAction.REJECTED),
         (IssueCode.BLANK_REQUIRED_FIELD, "counted_on", RowAction.REJECTED),
     ]
+
+
+@pytest.mark.parametrize(
+    ("row_text", "actual_column_count", "expected_extra_values"),
+    [
+        (
+            "SKU-001,Widget A,10,Warehouse A,2024-01-15,unexpected_trailing\n",
+            6,
+            "unexpected_trailing",
+        ),
+        (
+            (
+                "SKU-001,Widget A,10,Warehouse A,2024-01-15,"
+                "unexpected_1,unexpected_2,unexpected_3\n"
+            ),
+            8,
+            "unexpected_1, unexpected_2, unexpected_3",
+        ),
+    ],
+)
+def test_load_snapshot_rejects_overlong_rows_as_quality_issues(
+    tmp_path: Path,
+    row_text: str,
+    actual_column_count: int,
+    expected_extra_values: str,
+) -> None:
+    overlong_row_snapshot = tmp_path / "overlong_row_snapshot.csv"
+    overlong_row_snapshot.write_text(
+        "sku,product_name,qty,warehouse,updated_at\n" + row_text,
+        encoding="utf-8",
+    )
+
+    result = load_snapshot(
+        overlong_row_snapshot,
+        snapshot=SnapshotName.SNAPSHOT_2,
+    )
+
+    assert result.records == []
+
+    overlong_issue = next(
+        issue
+        for issue in result.issues
+        if issue.code == IssueCode.OVERLONG_ROW and issue.source_line == 2
+    )
+
+    assert overlong_issue.severity is IssueSeverity.ERROR
+    assert overlong_issue.field_name == "row"
+    assert overlong_issue.row_action is RowAction.REJECTED
+    assert overlong_issue.details == {
+        "expected_column_count": 5,
+        "actual_column_count": actual_column_count,
+        "extra_values": expected_extra_values,
+    }

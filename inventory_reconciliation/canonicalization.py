@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import math
 import re
 from dataclasses import dataclass
@@ -77,7 +75,13 @@ def canonicalize_row(
     )
     issues.extend(date_issues)
 
-    if None in (sku, name, quantity, location, counted_on):
+    if (
+        sku is None
+        or name is None
+        or quantity is None
+        or location is None
+        or counted_on is None
+    ):
         mark_row_action(issues, RowAction.REJECTED)
         return None, issues
 
